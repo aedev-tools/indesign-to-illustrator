@@ -5,6 +5,9 @@ const path = require("path");
 const fs = require("fs");
 const os = require("os");
 
+const IS_WIN = process.platform === "win32";
+const IS_MAC = process.platform === "darwin";
+
 const args = process.argv.slice(2);
 
 if (args.length === 0 || args.includes("--help") || args.includes("-h")) {
@@ -15,12 +18,18 @@ Converts an InDesign file (.indd or .idml) to Illustrator (.ai).
 Exports via EPS per-page, then combines in Illustrator.
 
 Requires Adobe InDesign and Illustrator to be installed.
+Works on macOS and Windows.
 
 Options:
   --debug           Keep intermediate files
   --help, -h        Show this help
 `);
   process.exit(0);
+}
+
+if (!IS_MAC && !IS_WIN) {
+  console.error("Error: Only macOS and Windows are supported.");
+  process.exit(1);
 }
 
 const inputFile = path.resolve(args[0]);
@@ -111,7 +120,6 @@ for (var i = 0; i < doc.pages.length; i++) {
   } catch(e) {}
 
   doc.exportFile(ExportFormat.EPS_TYPE, new File(epsPath));
-  $.writeln("Exported page " + doc.pages[i].name + " -> " + epsPath);
 }
 
 doc.close(SaveOptions.NO);
@@ -252,6 +260,14 @@ function runInDesign(script) {
   const scriptFile = path.join(tmpDir, "indesign_script.jsx");
   fs.writeFileSync(scriptFile, script, "utf8");
 
+  if (IS_MAC) {
+    runInDesignMac(scriptFile);
+  } else {
+    runInDesignWin(scriptFile);
+  }
+}
+
+function runInDesignMac(scriptFile) {
   const appNames = [
     "Adobe InDesign 2026",
     "Adobe InDesign 2025",
@@ -267,10 +283,7 @@ function runInDesign(script) {
           id.activate();
           id.doScript(Path("${scriptFile.replace(/"/g, '\\"')}"), {language: "javascript"});
         '`,
-        {
-          stdio: "pipe",
-          timeout: 300000,
-        }
+        { stdio: "pipe", timeout: 300000 }
       );
       return;
     } catch (err) {
@@ -281,17 +294,78 @@ function runInDesign(script) {
         process.exit(1);
       }
       lastErr = err;
-      continue;
     }
   }
 
-  console.error("Error: Failed to run script in InDesign.");
+  console.error("Error: Could not find Adobe InDesign (tried 2024-2026).");
   console.error(lastErr?.stderr?.toString() || lastErr?.message);
   cleanup();
   process.exit(1);
 }
 
+function runInDesignWin(scriptFile) {
+  // InDesign COM ProgIDs to try
+  const progIds = [
+    "InDesign.Application.2026",
+    "InDesign.Application.2025",
+    "InDesign.Application.2024",
+    "InDesign.Application",
+  ];
+
+  const vbsFile = path.join(tmpDir, "run_indesign.vbs");
+  const jsxPath = scriptFile.replace(/\\/g, "\\\\");
+
+  // Build VBScript that tries each ProgID
+  let vbs = `On Error Resume Next\nDim app\nDim found\nfound = False\n`;
+  for (const progId of progIds) {
+    vbs += `
+If Not found Then
+  Set app = CreateObject("${progId}")
+  If Not app Is Nothing Then
+    If Err.Number = 0 Then
+      found = True
+    End If
+  End If
+  If Err.Number <> 0 Then
+    Err.Clear
+  End If
+End If
+`;
+  }
+  vbs += `
+If Not found Then
+  WScript.StdErr.WriteLine "Error: Could not find Adobe InDesign (tried 2024-2026)."
+  WScript.Quit 1
+End If
+
+On Error GoTo 0
+app.ScriptPreferences.UserInteractionLevel = 1699640946
+app.DoScript "${jsxPath}", 1246973031
+`;
+
+  fs.writeFileSync(vbsFile, vbs, "utf8");
+
+  try {
+    execSync(`cscript //nologo "${vbsFile}"`, {
+      stdio: "pipe",
+      timeout: 300000,
+    });
+  } catch (err) {
+    console.error(`Error in InDesign script: ${err.stderr?.toString() || err.message}`);
+    cleanup();
+    process.exit(1);
+  }
+}
+
 function runIllustrator(scriptPath) {
+  if (IS_MAC) {
+    runIllustratorMac(scriptPath);
+  } else {
+    runIllustratorWin(scriptPath);
+  }
+}
+
+function runIllustratorMac(scriptPath) {
   const appNames = [
     "Adobe Illustrator",
     "Adobe Illustrator 2026",
@@ -308,10 +382,7 @@ function runIllustrator(scriptPath) {
           ai.activate();
           ai.doJavascript("$.evalFile(\\x27${jsEsc(scriptPath)}\\x27);");
         '`,
-        {
-          stdio: "pipe",
-          timeout: 600000,
-        }
+        { stdio: "pipe", timeout: 600000 }
       );
       return;
     } catch (err) {
@@ -322,14 +393,64 @@ function runIllustrator(scriptPath) {
         process.exit(1);
       }
       lastErr = err;
-      continue;
     }
   }
 
-  console.error("Error: Failed to run script in Illustrator.");
+  console.error("Error: Could not find Adobe Illustrator (tried 2024-2026).");
   console.error(lastErr?.stderr?.toString() || lastErr?.message);
   cleanup();
   process.exit(1);
+}
+
+function runIllustratorWin(scriptPath) {
+  const progIds = [
+    "Illustrator.Application.2026",
+    "Illustrator.Application.2025",
+    "Illustrator.Application.2024",
+    "Illustrator.Application",
+  ];
+
+  const vbsFile = path.join(tmpDir, "run_illustrator.vbs");
+  const jsxPath = jsEsc(scriptPath).replace(/'/g, "''");
+
+  let vbs = `On Error Resume Next\nDim app\nDim found\nfound = False\n`;
+  for (const progId of progIds) {
+    vbs += `
+If Not found Then
+  Set app = CreateObject("${progId}")
+  If Not app Is Nothing Then
+    If Err.Number = 0 Then
+      found = True
+    End If
+  End If
+  If Err.Number <> 0 Then
+    Err.Clear
+  End If
+End If
+`;
+  }
+  vbs += `
+If Not found Then
+  WScript.StdErr.WriteLine "Error: Could not find Adobe Illustrator (tried 2024-2026)."
+  WScript.Quit 1
+End If
+
+On Error GoTo 0
+app.DoJavaScript "$.evalFile('${jsxPath}');"
+`;
+
+  fs.writeFileSync(vbsFile, vbs, "utf8");
+
+  try {
+    execSync(`cscript //nologo "${vbsFile}"`, {
+      stdio: "pipe",
+      timeout: 600000,
+    });
+  } catch (err) {
+    console.error(`Error in Illustrator script: ${err.stderr?.toString() || err.message}`);
+    cleanup();
+    process.exit(1);
+  }
 }
 
 function jsEsc(str) {

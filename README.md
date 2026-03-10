@@ -18,10 +18,12 @@ That's what this tool does.
 
 ## Requirements
 
-- macOS (uses `osascript` for app automation)
+- macOS or Windows
 - Node.js >= 14
 - Adobe InDesign (2024, 2025, or 2026)
 - Adobe Illustrator (2024, 2025, or 2026)
+
+On macOS it uses `osascript` (JXA) for app automation. On Windows it uses COM automation via `cscript`.
 
 ## Install
 
@@ -84,7 +86,7 @@ Pages are laid out in a 3-column grid to stay within Illustrator's canvas limits
 
 ## Limitations
 
-- macOS only (relies on `osascript` / JXA for app automation)
+- macOS and Windows only (no Linux — Adobe apps don't run on Linux)
 - Both InDesign and Illustrator must be installed and licensed
 - Transparency effects get flattened (EPS limitation) — but at high resolution, so it looks good
 - Multi-page documents get combined into one Illustrator file with multiple artboards
