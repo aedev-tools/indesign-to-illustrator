@@ -1,0 +1,30 @@
+{
+  "name": "indesign-to-illustrator",
+  "version": "1.0.0",
+  "description": "Convert Adobe InDesign files (.indd) to Illustrator (.ai) from the command line. Preserves gradients, live text, and vectors.",
+  "main": "id2ai.js",
+  "bin": {
+    "id2ai": "./id2ai.js"
+  },
+  "keywords": [
+    "indesign",
+    "illustrator",
+    "adobe",
+    "convert",
+    "indd",
+    "ai",
+    "eps",
+    "design",
+    "print",
+    "cli"
+  ],
+  "author": "aedev.tools",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aedev-tools/indesign-to-illustrator"
+  },
+  "engines": {
+    "node": ">=14"
+  }
+}
