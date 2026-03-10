@@ -25,18 +25,21 @@ That's what this tool does.
 
 On macOS it uses `osascript` (JXA) for app automation. On Windows it uses COM automation via `cscript`.
 
-## Install
+## Quick start
+
+No install needed — just run it:
 
 ```bash
-npm install -g indesign-to-illustrator
+npx github:aedev-tools/indesign-to-illustrator myfile.indd
 ```
 
-Or clone and link:
+### Global install
+
+If you use it often:
 
 ```bash
-git clone https://github.com/aedev-tools/indesign-to-illustrator.git
-cd indesign-to-illustrator
-npm link
+npm install -g github:aedev-tools/indesign-to-illustrator
+id2ai myfile.indd
 ```
 
 ## Usage
